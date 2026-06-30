@@ -31,6 +31,7 @@ export class App {
 
       this.fileName.set(file.name);
       this.headers.set(parsed[0]);
+      // Limitamos la vista previa para que los CSV grandes no ralenticen el navegador.
       this.rows.set(parsed.slice(1, 1001));
       this.totalRows.set(Math.max(parsed.length - 1, 0));
     } catch {
