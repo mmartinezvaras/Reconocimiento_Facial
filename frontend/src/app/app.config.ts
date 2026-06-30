@@ -4,5 +4,5 @@ export const appConfig: ApplicationConfig = {
   providers: [
     provideBrowserGlobalErrorListeners(),
     
-  ]
+  ]//actualizacion
 };

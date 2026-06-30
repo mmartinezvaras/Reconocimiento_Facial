@@ -1,7 +1,11 @@
+# Entorno virtual de Python
 venv/
 __pycache__/
 *.pyc
+
+# Archivos generados por macOS
 .DS_Store
 
+# Registros generados por la aplicación
 *.csv
 *.numbers
