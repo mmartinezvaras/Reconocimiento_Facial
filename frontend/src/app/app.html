@@ -1,0 +1,88 @@
+<main>
+  <section class="hero">
+    <div class="eyebrow"><span></span> Panel de reconocimiento facial</div>
+    <h1>Tus registros,<br><em>claros y accesibles.</em></h1>
+    <p class="intro">
+      Consulta de forma rápida los datos exportados por el sistema. Selecciona un archivo CSV
+      para visualizar su contenido.
+    </p>
+
+    <label class="open-button" for="csv-file">
+      <svg viewBox="0 0 24 24" aria-hidden="true">
+        <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+      </svg>
+      Abrir archivo CSV
+    </label>
+    <input
+      id="csv-file"
+      type="file"
+      accept=".csv,text/csv"
+      (change)="openCsv($event)"
+    />
+    <p class="privacy">El archivo se procesa únicamente en tu navegador.</p>
+  </section>
+
+  <section class="visual" aria-hidden="true">
+    <div class="orb orb-one"></div>
+    <div class="orb orb-two"></div>
+    <div class="face-frame">
+      <span class="corner top-left"></span>
+      <span class="corner top-right"></span>
+      <span class="corner bottom-left"></span>
+      <span class="corner bottom-right"></span>
+      <div class="face-icon">
+        <div class="head"></div>
+        <div class="shoulders"></div>
+      </div>
+      <div class="scan-line"></div>
+    </div>
+    <div class="data-chip chip-one"><span></span> Sistema activo</div>
+    <div class="data-chip chip-two">CSV <strong>✓</strong></div>
+  </section>
+</main>
+
+@if (error()) {
+  <div class="message error" role="alert">{{ error() }}</div>
+}
+
+@if (headers().length > 0) {
+  <section class="results">
+    <header>
+      <div>
+        <span class="file-label">ARCHIVO ABIERTO</span>
+        <h2>{{ fileName() }}</h2>
+      </div>
+      <p>{{ totalRows() }} {{ totalRows() === 1 ? 'registro' : 'registros' }}</p>
+    </header>
+
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            @for (header of headers(); track $index) {
+              <th>{{ header || 'Columna ' + ($index + 1) }}</th>
+            }
+          </tr>
+        </thead>
+        <tbody>
+          @for (row of rows(); track $index) {
+            <tr>
+              @for (header of headers(); track $index) {
+                <td>{{ row[$index] || '—' }}</td>
+              }
+            </tr>
+          }
+        </tbody>
+      </table>
+    </div>
+
+    @if (totalRows() > 1000) {
+      <p class="limit-note">Se muestran los primeros 1.000 registros.</p>
+    }
+  </section>
+}
+
+<footer>
+  <span class="brand-mark"></span>
+  Reconocimiento facial · Gestión de registros
+</footer>
