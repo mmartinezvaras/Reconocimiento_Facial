@@ -1,130 +1,164 @@
-import face_recognition
-import cv2
-import numpy as np
 import csv
+import sys
+import warnings
 from datetime import datetime
+from pathlib import Path
 
-video_caprure = cv2.VideoCapture(0,cv2.CAP_AVFOUNDATION)  
+import cv2
 
-messi_image = face_recognition.load_image_file("photos/messi.png")
-messi_face_encoding = face_recognition.face_encodings(messi_image)[0]
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API.*",
+    category=UserWarning,
+    module="face_recognition_models",
+)
+import face_recognition
+import numpy as np
 
-cr7_image = face_recognition.load_image_file("photos/cr7.png")
-cr7_face_encoding = face_recognition.face_encodings(cr7_image)[0]
 
-lisa_image = face_recognition.load_image_file("photos/lisa.png")
-lisa_face_encoding = face_recognition.face_encodings(lisa_image)[0]
+BASE_DIR = Path(__file__).resolve().parent
+PHOTOS_DIR = BASE_DIR / "photos"
+PEOPLE = {
+    "Messi": "messi.png",
+    "Cristiano Ronaldo": "cr7.png",
+    "Lisa": "lisa.png",
+    "The Rock": "theRock.png",
+    "Will Smith": "will.png",
+}
+FRAME_SCALE = 0.25
 
-theRock_image = face_recognition.load_image_file("photos/theRock.png")
-theRock_face_encoding = face_recognition.face_encodings(theRock_image)[0]
 
-will_image = face_recognition.load_image_file("photos/will.png")
-will_face_encoding = face_recognition.face_encodings(will_image)[0]
+def load_known_faces() -> tuple[list[np.ndarray], list[str]]:
+    """Carga una codificacion facial por persona y explica cualquier foto invalida."""
+    encodings: list[np.ndarray] = []
+    names: list[str] = []
 
-known_face_encodings = [
-    messi_face_encoding,
-    cr7_face_encoding,
-    lisa_face_encoding,
-    theRock_face_encoding,
-    will_face_encoding
-]
+    for name, filename in PEOPLE.items():
+        photo_path = PHOTOS_DIR / filename
+        if not photo_path.is_file():
+            raise FileNotFoundError(f"No se encuentra la foto de {name}: {photo_path}")
 
-known_face_names = [
-    "Messi",
-    "Cristiano Ronaldo",
-    "Lisa",
-    "The Rock",
-    "Will Smith"
-]
+        image = face_recognition.load_image_file(photo_path)
+        faces = face_recognition.face_encodings(image)
+        if not faces:
+            raise ValueError(f"No se ha detectado ningún rostro en {photo_path.name}.")
 
-students = known_face_names.copy()
+        encodings.append(faces[0])
+        names.append(name)
 
-face_locations = []
-face_encodings = []
-face_names = []
-s = True
+    return encodings, names
 
-now = datetime.now()
-current_date = now.strftime("%Y-%m-%d")
 
-# "a" añade registros sin borrar los anteriores
-openFile = open(current_date + ".csv", "a", newline="")
-Inwriter = csv.writer(openFile)
+def open_camera() -> cv2.VideoCapture:
+    backend = cv2.CAP_AVFOUNDATION if sys.platform == "darwin" else cv2.CAP_ANY
+    camera = cv2.VideoCapture(0, backend)
+    if not camera.isOpened():
+        camera.release()
+        raise RuntimeError(
+            "No se pudo abrir la cámara. Comprueba sus permisos y que otra aplicación no la esté usando."
+        )
+    return camera
 
-while True:
-    ret, frame = video_caprure.read()
 
-    if not ret or frame is None:
-        print("Error: no se pudo obtener imagen de la cámara.")
-        break
-
-    small_frame = cv2.resize(
-        frame,
-        (0, 0),
-        fx=0.25,
-        fy=0.25
-    )
-
-    rgb_small_frame = cv2.cvtColor(
-        small_frame,
-        cv2.COLOR_BGR2RGB
-    )
-
-    if s:
-        face_locations = face_recognition.face_locations(
-            rgb_small_frame
+def draw_faces(
+    frame: np.ndarray,
+    locations: list[tuple[int, int, int, int]],
+    names: list[str],
+) -> None:
+    inverse_scale = round(1 / FRAME_SCALE)
+    for (top, right, bottom, left), name in zip(locations, names):
+        top, right, bottom, left = (
+            top * inverse_scale,
+            right * inverse_scale,
+            bottom * inverse_scale,
+            left * inverse_scale,
+        )
+        color = (46, 184, 135) if name != "Desconocido" else (70, 70, 220)
+        cv2.rectangle(frame, (left, top), (right, bottom), color, 2)
+        cv2.rectangle(frame, (left, bottom - 30), (right, bottom), color, cv2.FILLED)
+        cv2.putText(
+            frame,
+            name,
+            (left + 6, bottom - 8),
+            cv2.FONT_HERSHEY_DUPLEX,
+            0.55,
+            (255, 255, 255),
+            1,
         )
 
-        face_encodings = face_recognition.face_encodings(
-            rgb_small_frame,
-            face_locations
-        )
 
-        face_names = []
+def run() -> None:
+    known_encodings, known_names = load_known_faces()
+    pending = set(known_names)
+    csv_path = BASE_DIR / f"{datetime.now():%Y-%m-%d}.csv"
+    camera = open_camera()
 
-        for face_encoding in face_encodings:
-            matches = face_recognition.compare_faces(
-                known_face_encodings,
-                face_encoding
-            )
+    face_locations: list[tuple[int, int, int, int]] = []
+    face_names: list[str] = []
+    process_frame = True
 
-            name = ""
+    try:
+        with csv_path.open("a+", newline="", encoding="utf-8") as csv_file:
+            writer = csv.writer(csv_file)
+            csv_file.seek(0, 2)
+            if csv_file.tell() == 0:
+                writer.writerow(["Nombre", "Hora"])
+                csv_file.flush()
 
-            face_distance = face_recognition.face_distance(
-                known_face_encodings,
-                face_encoding
-            )
+            print("Cámara activa. Pulsa q para salir.")
+            while True:
+                success, frame = camera.read()
+                if not success or frame is None:
+                    raise RuntimeError("Se perdió la conexión con la cámara.")
 
-            best_match_index = np.argmin(face_distance)
-
-            if matches[best_match_index]:
-                name = known_face_names[best_match_index]
-
-            face_names.append(name)
-
-            if name in known_face_names:
-                if name in students:
-                    students.remove(name)
-
-                    print("Personas pendientes:", students)
-
-                    current_time = datetime.now().strftime("%H-%M-%S")
-
-                    Inwriter.writerow([name, current_time])
-
-                    openFile.flush()
-
-                    print(
-                        "Asistencia registrada:",
-                        name,
-                        current_time
+                if process_frame:
+                    small_frame = cv2.resize(
+                        frame, (0, 0), fx=FRAME_SCALE, fy=FRAME_SCALE
                     )
+                    rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
+                    face_locations = face_recognition.face_locations(rgb_frame)
+                    current_encodings = face_recognition.face_encodings(
+                        rgb_frame, face_locations
+                    )
+                    face_names = []
 
-    cv2.imshow("Attendance System", frame)
+                    for encoding in current_encodings:
+                        distances = face_recognition.face_distance(
+                            known_encodings, encoding
+                        )
+                        best_index = int(np.argmin(distances))
+                        matches = face_recognition.compare_faces(
+                            known_encodings, encoding
+                        )
+                        name = (
+                            known_names[best_index]
+                            if matches[best_index]
+                            else "Desconocido"
+                        )
+                        face_names.append(name)
 
-    if cv2.waitKey(1) & 0xFF == ord("q"):
-        break
+                        if name in pending:
+                            pending.remove(name)
+                            current_time = datetime.now().strftime("%H:%M:%S")
+                            writer.writerow([name, current_time])
+                            csv_file.flush()
+                            print(f"Asistencia registrada: {name} a las {current_time}")
+                            print("Personas pendientes:", sorted(pending) or "ninguna")
 
-video_caprure.release()
-cv2.destroyAllWindows()
-openFile.close()
+                process_frame = not process_frame
+                draw_faces(frame, face_locations, face_names)
+                cv2.imshow("Sistema de asistencia - pulsa q para salir", frame)
+
+                if cv2.waitKey(1) & 0xFF == ord("q"):
+                    break
+    finally:
+        camera.release()
+        cv2.destroyAllWindows()
+
+
+if __name__ == "__main__":
+    try:
+        run()
+    except (FileNotFoundError, RuntimeError, ValueError) as error:
+        print(f"Error: {error}", file=sys.stderr)
+        raise SystemExit(1) from error

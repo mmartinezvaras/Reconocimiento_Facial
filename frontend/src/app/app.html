@@ -1,10 +1,10 @@
 <main>
   <section class="hero">
     <div class="eyebrow"><span></span> Panel de reconocimiento facial</div>
-    <h1>Tus registros,<br><em>claros y accesibles.</em></h1>
+    <h1>Tus registros,<br /><em>claros y accesibles.</em></h1>
     <p class="intro">
-      Consulta de forma rápida los datos exportados por el sistema. Selecciona un archivo CSV
-      para visualizar su contenido.
+      Consulta de forma rápida los datos exportados por el sistema. Selecciona un archivo CSV para
+      visualizar su contenido.
     </p>
 
     <label class="open-button" for="csv-file">
@@ -13,12 +13,7 @@
       </svg>
       Abrir archivo CSV
     </label>
-    <input
-      id="csv-file"
-      type="file"
-      accept=".csv,text/csv"
-      (change)="openCsv($event)"
-    />
+    <input id="csv-file" type="file" accept=".csv,text/csv" (change)="openCsv($event)" />
     <p class="privacy">El archivo se procesa únicamente en tu navegador.</p>
   </section>
 

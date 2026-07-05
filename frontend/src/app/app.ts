@@ -29,11 +29,12 @@ export class App {
         throw new Error('El archivo está vacío.');
       }
 
+      const normalized = this.addLegacyHeaders(parsed);
       this.fileName.set(file.name);
-      this.headers.set(parsed[0]);
+      this.headers.set(normalized[0]);
       // Limitamos la vista previa para que los CSV grandes no ralenticen el navegador.
-      this.rows.set(parsed.slice(1, 1001));
-      this.totalRows.set(Math.max(parsed.length - 1, 0));
+      this.rows.set(normalized.slice(1, 1001));
+      this.totalRows.set(Math.max(normalized.length - 1, 0));
     } catch {
       this.fileName.set('');
       this.headers.set([]);
@@ -79,7 +80,23 @@ export class App {
     row.push(value.trim());
     if (row.some((cell) => cell.length > 0)) result.push(row);
 
+    if (insideQuotes) {
+      throw new Error('El CSV contiene una comilla sin cerrar.');
+    }
+
     return result;
+  }
+
+  private addLegacyHeaders(rows: string[][]): string[][] {
+    const firstRow = rows[0];
+    const attendanceTime = /^\d{2}[:-]\d{2}[:-]\d{2}$/;
+
+    // Las primeras versiones de program.py exportaban asistencias sin cabecera.
+    if (firstRow.length === 2 && attendanceTime.test(firstRow[1])) {
+      return [['Nombre', 'Hora'], ...rows];
+    }
+
+    return rows;
   }
 
   private detectDelimiter(contents: string): string {
